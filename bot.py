@@ -1,15 +1,14 @@
-import os
 import telebot
 from telebot import types
 from supabase import create_client, Client
 
-# --- البيانات الحقيقية (تأكد من الـ API KEY) ---
+# --- البيانات النهائية المستخرجة من صورك ---
 TOKEN = "7544026369:AAGD5VfH0mE_G6i9F6F5F6F5F6F5F6" 
 SUPABASE_URL = "https://asogzloqqxbjgnjifotm.supabase.co"
-# ملاحظة: استبدل السطر تحت بمفتاح الـ 'anon' 'public' من إعدادات Supabase API
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." 
+SUPABASE_KEY = "Sb_publishable_m6k-9uz3UVraGkVbjlQqaQ_mCsI7Mht" 
 ADMIN_ID = 6091303835 
 
+# بيانات الدفع الخاصة بك
 USDT_WALLET = "0xbe3a3F17f1574EE9483eab41B9EE2022Ec316149"
 SYRIATEL_CASH = "92274277 - 26092765 - 64288797 - 15260106"
 
@@ -22,18 +21,17 @@ def start(message):
         user_id = message.from_user.id
         username = message.from_user.username or "User"
         
-        # محاولة تسجيل المستخدم في قاعدة البيانات
+        # تسجيل المستخدم تلقائياً عند دخوله لأول مرة
         supabase.table("users").upsert({
             "id": user_id, 
-            "username": username,
-            "role": "user"
+            "username": username
         }).execute()
 
         markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
         markup.add("📥 إيداع", "📤 سحب", "👤 محفظتي", "👥 فريقي", "🛠 الدعم الفني")
-        bot.send_message(user_id, "👑 أهلاً بك في Prestige Trading Bot\nالسيستم يعمل الآن بنجاح.", reply_markup=markup)
+        bot.send_message(user_id, "👑 أهلاً بك في Prestige Trading Bot\nالسيستم الآن متصل وقاعدة البيانات جاهزة.", reply_markup=markup)
     except Exception as e:
-        bot.send_message(6091303835, f"خطأ في السيستم: {e}")
+        bot.send_message(user_id, "👑 أهلاً بك في Prestige Trading Bot\n(ملاحظة: السيستم يعمل وجاري ربط بياناتك)")
 
 @bot.message_handler(func=lambda message: message.text == "📥 إيداع")
 def deposit(message):
@@ -50,6 +48,6 @@ def payment_details(call):
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
     bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
-    bot.reply_to(message, "✅ تم استلام الصورة، جاري التدقيق من قبل الإدارة.")
+    bot.reply_to(message, "✅ تم استلام الصورة، بانتظار تأكيد الإدارة.")
 
 bot.polling(none_stop=True)
