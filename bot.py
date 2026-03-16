@@ -8,11 +8,6 @@ TOKEN = "8795395476:AAFVU9fXwQF8dwlh8kSnK1Z9GnOY4VEag8Q"
 SUPABASE_URL = "https://asogzloqqxbjgnjifotm.supabase.co"
 SUPABASE_KEY = "sb_publishable_m6k-9uz3UVraGkVbjlQqaQ_mCsI7Mht"
 ADMIN_ID = 6091303835 
-SUPPORT_USER = "@tradinghubsy"
-
-# عناوين الإيداع
-USDT_ADDR = "0xbe3a3F17f1574EE9483eab41B9EE2022Ec316149"
-SYRIATEL_CASH = "92274277 - 26092765"
 
 bot = telebot.TeleBot(TOKEN)
 db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -30,8 +25,8 @@ def main_kb(uid):
         types.InlineKeyboardButton("📊 صفقات البوت", callback_data="bot_trades"),
         types.InlineKeyboardButton("💰 اربح معنا", callback_data="earn"),
         types.InlineKeyboardButton("🎁 جوائز الإحالات", callback_data="prizes"),
-        types.InlineKeyboardButton("🤵 جوائز الوكلاء", callback_data="agents"),
-        types.InlineKeyboardButton("🛠 الدعم الفني", url=f"https://t.me/{SUPPORT_USER[1:]}")
+        types.InlineKeyboardButton("🏆 الوكيل الذهبي", callback_data="agents"),
+        types.InlineKeyboardButton("🛠 الدعم الفني", url="https://t.me/tradinghubsy")
     )
     if uid == ADMIN_ID:
         markup.add(types.InlineKeyboardButton("👑 لوحة تحكم الأدمن", callback_data="admin_main"))
@@ -40,75 +35,105 @@ def main_kb(uid):
 def back_kb():
     return types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 العودة للقائمة", callback_data="home"))
 
-# --- الأوامر الأساسية ---
+# --- أوامر الأدمن ---
+
+@bot.callback_query_handler(func=lambda call: call.data == "admin_main")
+def admin_panel(call):
+    if call.from_user.id != ADMIN_ID: return
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("📢 تعميم صفقة جديدة", callback_data="adm_send_trade"),
+        types.InlineKeyboardButton("✅ تعميم نتيجة صفقة", callback_data="adm_send_result"),
+        types.InlineKeyboardButton("👥 إدارة الوكلاء الذهبيين", callback_data="adm_manage_agents"),
+        types.InlineKeyboardButton("📊 إحصائيات البوت", callback_data="adm_stats"),
+        types.InlineKeyboardButton("🔙 رجوع", callback_data="home")
+    )
+    bot.edit_message_text("👑 **لوحة التحكم العليا**\nأهلاً بك يا زعيم، اختر ما تريد التحكم به:", call.from_user.id, call.message.message_id, reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "adm_stats")
+def bot_stats(call):
+    count = db.table("users").select("id", count='exact').execute().count
+    bot.answer_callback_query(call.id, f"عدد المستخدمين الكلي: {count}")
+
+@bot.callback_query_handler(func=lambda call: call.data == "adm_manage_agents")
+def manage_agents_kb(call):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("➕ إضافة وكيل", callback_data="add_agent_flow"))
+    markup.add(types.InlineKeyboardButton("🔙 رجوع", callback_data="admin_main"))
+    bot.edit_message_text("🛠 **إدارة الوكلاء**\nيمكنك منح صلاحيات الوكيل الذهبي للمستخدمين عبر الـ ID:", call.from_user.id, call.message.message_id, reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "add_agent_flow")
+def ask_id(call):
+    msg = bot.send_message(call.from_user.id, "ارسل ID المستخدم المراد ترقيته:")
+    bot.register_next_step_handler(msg, process_agent_upgrade)
+
+def process_agent_upgrade(message):
+    try:
+        uid = int(message.text)
+        db.table("users").update({"is_agent": True}).eq("id", uid).execute()
+        bot.send_message(ADMIN_ID, f"✅ تم تفعيل الوكيل الذهبي لـ `{uid}`")
+        bot.send_message(uid, "🎊 تهانينا! تمت ترقيتك إلى **وكيل ذهبي**.")
+    except: bot.send_message(ADMIN_ID, "❌ خطأ في الـ ID.")
+
+# --- الأقسام العامة ---
+
+@bot.callback_query_handler(func=lambda call: call.data == "earn")
+def earn_section(call):
+    time.sleep(0.6)
+    txt = ("💰 **قسم اربح معنا (المروجين)**\n\n"
+           "اربح دولارات مقابل الترويج للبوت:\n\n"
+           "📹 **فيديو (تيك توك/يوتيوب):**\n"
+           "• يجب أن يظهر البوت وصورته بشكل واضح.\n"
+           "• استخدم هاشتاقات: #Prestige_Trading #تداول\n"
+           "• المكافأة: 10$ لكل 2000 مشاهدة.\n\n"
+           "📸 **منشورات اجتماعية:**\n"
+           "• نشر الرابط في مجموعات تداول كبرى.\n\n"
+           "ارسل رابط عملك للدعم الفني للتقييم.")
+    bot.edit_message_text(txt, call.from_user.id, call.message.message_id, reply_markup=back_kb())
+
+@bot.callback_query_handler(func=lambda call: call.data == "team")
+def team_section(call):
+    uid = call.from_user.id
+    link = f"https://t.me/Prestige_Trading_Bot?start={uid}"
+    txt = (f"👥 **نظام الشركاء**\n\n"
+           f"رابط دعوتك الحصري:\n`{link}`\n\n"
+           f"اربح عمولة 5% على كل إيداع يقوم به فريقك.")
+    bot.edit_message_text(txt, uid, call.message.message_id, reply_markup=back_kb(), parse_mode="Markdown")
+
+# --- نظام التعميم (Broadcast) ---
+
+def broadcast_logic(message, title):
+    bot.send_message(ADMIN_ID, "⏳ جاري الإرسال للجميع مع التأخير البرمجي...")
+    users = db.table("users").select("id").execute().data
+    for u in users:
+        try:
+            time.sleep(0.1) # التأخير المطلوب لمنع الحظر والتعليق
+            bot.send_message(u['id'], f"{title}\n\n{message.text}", parse_mode="Markdown")
+        except: continue
+    bot.send_message(ADMIN_ID, "✅ تم اكتمال الإرسال.")
+
+@bot.callback_query_handler(func=lambda call: call.data == "adm_send_trade")
+def trade_msg(call):
+    msg = bot.send_message(ADMIN_ID, "ارسل نص الصفقة الآن:")
+    bot.register_next_step_handler(msg, broadcast_logic, "🚨 **صفقة جديدة من الإدارة**")
+
+@bot.callback_query_handler(func=lambda call: call.data == "adm_send_result")
+def result_msg(call):
+    msg = bot.send_message(ADMIN_ID, "ارسل نص النتيجة الآن:")
+    bot.register_next_step_handler(msg, broadcast_logic, "✅ **تحديث نتيجة التداول**")
+
+# --- التشغيل الأساسي ---
 
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
-    uid = message.from_user.id
-    uname = message.from_user.username or "Prestige_User"
-    
-    bot.send_message(uid, "💎 جاري تهيئة نظام Prestige...", reply_markup=types.ReplyKeyboardRemove())
-    
-    ref_by = None
-    args = message.text.split()
-    if len(args) > 1 and args[1].isdigit():
-        ref_by = int(args[1]) if int(args[1]) != uid else None
+    time.sleep(0.5)
+    bot.send_message(message.from_user.id, "💎 جاري تهيئة نظام Prestige...", reply_markup=main_kb(message.from_user.id))
 
-    try:
-        db.table("users").upsert({"id": uid, "username": uname, "referred_by": ref_by}).execute()
-        if ref_by:
-            db.rpc('increment_refs', {'user_id': ref_by}).execute()
-    except: pass
+@bot.callback_query_handler(func=lambda call: call.data == "home")
+def home_btn(call):
+    bot.edit_message_text("القائمة الرئيسية:", call.from_user.id, call.message.message_id, reply_markup=main_kb(call.from_user.id))
 
-    welcome = (f"🏆 **منصة Prestige Trading**\n\n"
-               f"أهلاً بك {uname} في أقوى سيستم تداول.\n"
-               f"حسابك جاهز الآن لتحقيق الأرباح.\n\n"
-               f"💰 رصيدك الحالي: **0.00$**")
-    bot.send_message(uid, welcome, reply_markup=main_kb(uid), parse_mode="Markdown")
-
-# --- دوال الإرسال الجماعي (للأدمن) ---
-def send_broadcast_trade(message):
-    bot.send_message(ADMIN_ID, "⏳ جاري إرسال الصفقة للجميع...")
-    try:
-        users = db.table("users").select("id").execute().data
-        count = 0
-        for u in users:
-            try:
-                bot.send_message(u['id'], f"🚨 **صفقة جديدة من الإدارة** 🚨\n\n{message.text}")
-                count += 1
-            except: pass
-        bot.send_message(ADMIN_ID, f"✅ تم إرسال الصفقة بنجاح إلى {count} متداول.")
-    except Exception as e:
-        bot.send_message(ADMIN_ID, f"❌ خطأ: {e}")
-
-def send_broadcast_result(message):
-    bot.send_message(ADMIN_ID, "⏳ جاري إرسال النتيجة للجميع...")
-    try:
-        users = db.table("users").select("id").execute().data
-        count = 0
-        for u in users:
-            try:
-                bot.send_message(u['id'], f"💰 **تحديث نتيجة الصفقة** 💰\n\n{message.text}")
-                count += 1
-            except: pass
-        bot.send_message(ADMIN_ID, f"✅ تم إرسال النتيجة بنجاح إلى {count} متداول.")
-    except Exception as e:
-        bot.send_message(ADMIN_ID, f"❌ خطأ: {e}")
-
-# --- معالجة الضغطات ---
-
-@bot.callback_query_handler(func=lambda call: True)
-def handle_btns(call):
-    uid = call.from_user.id
-    mid = call.message.message_id
-
-    # تأخير خفيف جداً يمنع التعليق ويوحي بالانتقال الطبيعي
-    bot.answer_callback_query(call.id, "جاري المعالجة...")
-    time.sleep(0.3) 
-
-    if call.data == "home":
-        bot.edit_message_text("القائمة الرئيسية للمنصة:", uid, mid, reply_markup=main_kb(uid))
-
+bot.infinity_polling()
     elif call.data == "wallet":
         res = db.table("users").select("balance").eq("id", uid).execute()
         bal = res.data[0]['balance'] if res.data else 0.0
