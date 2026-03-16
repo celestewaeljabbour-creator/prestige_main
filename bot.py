@@ -2,113 +2,223 @@ import telebot
 from telebot import types
 from supabase import create_client, Client
 import time
-import threading
 import logging
 
-# --- [ الإعدادات الأساسية ] ---
+# --- [ 1. الإعدادات والربط ] ---
 TOKEN = "8795395476:AAFVU9fXwQF8dwlh8kSnK1Z9GnOY4VEag8Q" 
 SUPABASE_URL = "https://asogzloqqxbjgnjifotm.supabase.co"
 SUPABASE_KEY = "sb_publishable_m6k-9uz3UVraGkVbjlQqaQ_mCsI7Mht"
 ADMIN_ID = 6091303835 
 SUPPORT_LINK = "https://t.me/tradinghubsy"
 
-# --- [ المحافظ المالية ] ---
-USDT_WALLET = "0xbe3a3F17f1574EE9483eab41B9EE2022Ec316149"
-SYRIATEL_CASH = "92274277 - 26092765"
+# البيانات المالية
+WALLET_USDT = "0xbe3a3F17f1574EE9483eab41B9EE2022Ec316149"
+CASH_SY = "92274277 - 26092765"
 
-# --- [ تهيئة النظام ] ---
 bot = telebot.TeleBot(TOKEN)
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 logging.basicConfig(level=logging.INFO)
 
-# --- [ بناء القوائم الاحترافية ] ---
+# --- [ 2. دوال القوائم (Keyboard Functions) ] ---
 
-def get_main_keyboard(user_id):
-    """إنشاء القائمة الرئيسية المتكاملة"""
+def main_menu(uid):
     markup = types.InlineKeyboardMarkup(row_width=2)
-    btns = [
-        types.InlineKeyboardButton("📥 إيداع رصيد", callback_data="btn_deposit"),
-        types.InlineKeyboardButton("📤 سحب أرباح", callback_data="btn_withdraw"),
-        types.InlineKeyboardButton("👤 محفظتي", callback_data="btn_wallet"),
-        types.InlineKeyboardButton("👥 فريقي", callback_data="btn_team"),
-        types.InlineKeyboardButton("📈 تداول آلي (AI)", callback_data="btn_ai_trade"),
-        types.InlineKeyboardButton("📊 صفقات البوت", callback_data="btn_bot_trades"),
-        types.InlineKeyboardButton("💰 اربح معنا", callback_data="btn_earn_with_us"),
-        types.InlineKeyboardButton("🎁 جوائز الإحالات", callback_data="btn_prizes"),
-        types.InlineKeyboardButton("🤵 قسم الوكلاء", callback_data="btn_agents"),
+    markup.add(
+        types.InlineKeyboardButton("📥 إيداع رصيد", callback_data="m_deposit"),
+        types.InlineKeyboardButton("📤 سحب أرباح", callback_data="m_withdraw"),
+        types.InlineKeyboardButton("👤 محفظتي", callback_data="m_wallet"),
+        types.InlineKeyboardButton("👥 فريقي", callback_data="m_team"),
+        types.InlineKeyboardButton("📈 تداول آلي (AI)", callback_data="m_ai"),
+        types.InlineKeyboardButton("📊 صفقات البوت", callback_data="m_trades"),
+        types.InlineKeyboardButton("💰 اربح معنا", callback_data="m_earn"),
+        types.InlineKeyboardButton("🎁 جوائز الإحالات", callback_data="m_prizes"),
+        types.InlineKeyboardButton("🤵 قسم الوكلاء", callback_data="m_agents"),
         types.InlineKeyboardButton("🛠 الدعم الفني", url=SUPPORT_LINK)
-    ]
-    markup.add(*btns)
-    if user_id == ADMIN_ID:
-        markup.add(types.InlineKeyboardButton("👑 لوحة تحكم الأدمن (السرية)", callback_data="admin_panel"))
+    )
+    if uid == ADMIN_ID:
+        markup.add(types.InlineKeyboardButton("👑 لوحة تحكم الأدمن", callback_data="admin_main"))
     return markup
 
-def get_back_keyboard():
-    """زر العودة الموحد"""
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_home"))
-    return markup
+def back_btn():
+    return types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 العودة للقائمة", callback_data="go_home"))
 
-def get_admin_keyboard():
-    """لوحة تحكم الأدمن المفصلة"""
+def admin_kb():
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("📢 تعميم صفقة جديدة (Broadcast)", callback_data="adm_broadcast_trade"),
-        types.InlineKeyboardButton("✅ تعميم نتيجة (ربح/خسارة)", callback_data="adm_broadcast_result"),
-        types.InlineKeyboardButton("🏆 إدارة الوكلاء الذهبيين", callback_data="adm_manage_gold"),
-        types.InlineKeyboardButton("📊 إحصائيات النظام", callback_data="adm_stats_check"),
-        types.InlineKeyboardButton("💰 تعديل رصيد مستخدم", callback_data="adm_edit_user_balance"),
-        types.InlineKeyboardButton("🔙 خروج من اللوحة", callback_data="back_to_home")
+        types.InlineKeyboardButton("📢 تعميم صفقة جديدة", callback_data="adm_broadcast_trade"),
+        types.InlineKeyboardButton("✅ تعميم نتيجة صفقة", callback_data="adm_broadcast_result"),
+        types.InlineKeyboardButton("🤵 إدارة الوكلاء الذهبيين", callback_data="adm_gold_agents"),
+        types.InlineKeyboardButton("📊 إحصائيات البوت", callback_data="adm_stats"),
+        types.InlineKeyboardButton("💰 شحن رصيد مستخدم (ID)", callback_data="adm_charge_user"),
+        types.InlineKeyboardButton("🔙 رجوع", callback_data="go_home")
     )
     return markup
 
-# --- [ معالجة الأوامر النصية ] ---
+# --- [ 3. أوامر التشغيل (Commands) ] ---
 
 @bot.message_handler(commands=['start'])
-def welcome_user(message):
+def start_command(message):
     uid = message.from_user.id
-    uname = message.from_user.username or "Prestige_Member"
+    uname = message.from_user.username or "Prestige_User"
     
-    # رسالة تحميل لتعطي طابع الفخامة
-    loading = bot.send_message(uid, "🔄 جاري الاتصال بخوادم Prestige...")
-    time.sleep(1.2)
-    bot.delete_message(uid, loading.message_id)
-
-    # معالجة الإحالة (Referral System)
-    referrer = None
+    # محاكاة التحميل
+    bot.send_chat_action(uid, 'typing')
+    time.sleep(0.4)
+    
+    # فحص الإحالة
+    ref_by = None
     args = message.text.split()
     if len(args) > 1 and args[1].isdigit():
-        ref_id = int(args[1])
-        if ref_id != uid:
-            referrer = ref_id
+        ref_by = int(args[1]) if int(args[1]) != uid else None
 
-    # التسجيل في Supabase
+    # التسجيل في القاعدة
     try:
-        supabase.table("users").upsert({
-            "id": uid, 
-            "username": uname, 
-            "referred_by": referrer,
-            "balance": 0.0
+        db.table("users").upsert({
+            "id": uid, "username": uname, "referred_by": ref_by, "balance": 0.0
         }).execute()
-    except Exception as e:
-        print(f"Error upserting user: {e}")
+    except: pass
 
-    welcome_text = (
-        f"🏆 **مرحباً بك في عالم Prestige Trading**\n\n"
-        f"أهلاً بك يا {uname} في المنصة الرسمية للتداول الآلي والصفقات المضمونة.\n\n"
-        f"💳 **معلومات الحساب:**\n"
-        f"• حالة الحساب: نشط ✅\n"
-        f"• الرصيد: 0.00$\n\n"
-        f"استخدم الأزرار أدناه للبدء في رحلة الأرباح."
+    welcome_msg = (
+        f"💎 **مرحباً بك في نظام Prestige للتداول**\n\n"
+        f"أهلاً بك يا `{uname}`.. تم تهيئة حسابك بنجاح.\n"
+        f"يمكنك البدء بمتابعة الصفقات أو شحن محفظتك للاستثمار الآلي."
     )
-    bot.send_message(uid, welcome_text, reply_markup=get_main_keyboard(uid), parse_mode="Markdown")
+    bot.send_message(uid, welcome_msg, reply_markup=main_menu(uid), parse_mode="Markdown")
 
-# --- [ معالجة ضغطات الأزرار (Logic) ] ---
+# --- [ 4. معالجة الأزرار (Callback Router) ] ---
 
 @bot.callback_query_handler(func=lambda call: True)
-def callback_router(call):
+def router(call):
     uid = call.from_user.id
     mid = call.message.message_id
+    
+    # إضافة التأخير المطلوب (0.5 ثانية) للرزانة
+    time.sleep(0.5)
+    bot.answer_callback_query(call.id)
+
+    if call.data == "go_home":
+        bot.edit_message_text("💎 القائمة الرئيسية لمنصة Prestige:", uid, mid, reply_markup=main_menu(uid))
+
+    # --- أقسام المستخدم ---
+    elif call.data == "m_wallet":
+        res = db.table("users").select("balance").eq("id", uid).execute()
+        balance = res.data[0]['balance'] if res.data else 0.0
+        txt = (f"👤 **مركزك المالي**\n\n"
+               f"💰 الرصيد الحالي: `{balance}$`\n"
+               f"📊 أرباح اليوم: `0.00$`\n"
+               f"⌛️ سحوبات معلقة: `0.00$`")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_team":
+        link = f"https://t.me/Prestige_Trading_Bot?start={uid}"
+        txt = (f"👥 **نظام الشركاء**\n\n"
+               f"اربح **5%** عمولة فورية عن كل إيداع يقوم به فريقك.\n\n"
+               f"🔗 رابط الدعوة الخاص بك:\n`{link}`")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_earn":
+        txt = ("💰 **اربح معنا (برنامج المروجين)**\n\n"
+               "انشر عن البوت واربح مبالغ حقيقية:\n"
+               "🎥 **TikTok/YouTube:**\n"
+               "• مكافأة **10$** لكل 2000 مشاهدة.\n"
+               "• استخدم هاشتاق: #Prestige_Trading\n\n"
+               "📢 ارسل رابط المنشور للدعم للمراجعة والصرف.")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_prizes":
+        txt = ("🎁 **جوائز الإحالات الكبرى**\n\n"
+               "حقق الأهداف واستلم جائزتك فوراً (لأول 10 أشخاص):\n"
+               "• 10 إيداعات (50$) ⬅️ **iPhone 15 Pro Max**\n"
+               "• 10 إيداعات (25$) ⬅️ **iPhone 13 Pro**\n"
+               "• 10 إيداعات (15$) ⬅️ **Xiaomi Phone**\n"
+               "• 10 إيداعات (10$) ⬅️ **Smart Watch**\n"
+               "• 10 إيداعات (5$) ⬅️ **AirPods Pro**\n\n"
+               "اللعبة سرعة.. شد الهمة!")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_agents":
+        txt = ("🤵 **برنامج الوكلاء (VIP)**\n\n"
+               "المميزات:\n"
+               "• راتب شهري ثابت: **100$**.\n"
+               "• عمولة فريق: **10%**.\n"
+               "• دعم فني خاص 24/7.\n\n"
+               "**الشرط:** فريق نشط فوق 50 عضو.\n"
+               "تواصل مع الإدارة لتقديم طلبك.")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    # --- أقسام الإيداع والسحب ---
+    elif call.data == "m_deposit":
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton("USDT (BEP20) ⚡️", callback_data="pay_usdt"),
+            types.InlineKeyboardButton("Syriatel Cash 🇸🇾", callback_data="pay_syria"),
+            types.InlineKeyboardButton("🔙 رجوع", callback_data="go_home")
+        )
+        bot.edit_message_text("📥 اختر وسيلة الإيداع المناسبة:", uid, mid, reply_markup=markup)
+
+    elif call.data.startswith("pay_"):
+        addr = WALLET_USDT if "usdt" in call.data else CASH_SY
+        txt = (f"⚠️ **تعليمات الشحن:**\n\n"
+               f"1. حول المبلغ إلى:\n`{addr}`\n\n"
+               f"2. ارسل صورة الإيصال (Screenshot) هنا في البوت.\n"
+               f"سيتم تفعيل رصيدك يدوياً خلال دقائق.")
+        bot.edit_message_text(txt, uid, mid, parse_mode="Markdown")
+
+    # --- لوحة التحكم (الأدمن) ---
+    elif call.data == "admin_main" and uid == ADMIN_ID:
+        bot.edit_message_text("👑 **لوحة الإدارة العليا**", uid, mid, reply_markup=admin_kb())
+
+    elif call.data == "adm_stats" and uid == ADMIN_ID:
+        count = db.table("users").select("id", count='exact').execute().count
+        bot.answer_callback_query(call.id, f"عدد المستخدمين: {count}", show_alert=True)
+
+    elif call.data == "adm_gold_agents" and uid == ADMIN_ID:
+        msg = bot.send_message(uid, "ارسل ID المستخدم لتعيينه كوكيل ذهبي:")
+        bot.register_next_step_handler(msg, set_agent_logic)
+
+    elif call.data == "adm_broadcast_trade" and uid == ADMIN_ID:
+        msg = bot.send_message(uid, "اكتب تفاصيل الصفقة الجديدة (سيتم الإرسال للكل):")
+        bot.register_next_step_handler(msg, broadcast_logic, "🚨 **صفقة جديدة من الإدارة**")
+
+    elif call.data == "adm_broadcast_result" and uid == ADMIN_ID:
+        msg = bot.send_message(uid, "اكتب نتيجة الصفقة (ربح/خسارة) للتعميم:")
+        bot.register_next_step_handler(msg, broadcast_logic, "✅ **تحديث نتيجة التداول**")
+
+# --- [ 5. منطق الإدارة (Next Step Functions) ] ---
+
+def set_agent_logic(message):
+    try:
+        target_id = int(message.text)
+        db.table("users").update({"is_agent": True}).eq("id", target_id).execute()
+        bot.send_message(ADMIN_ID, f"✅ تم تعيين `{target_id}` كوكيل ذهبي.")
+        bot.send_message(target_id, "🎊 مبروك! تمت ترقيتك لدرجة **وكيل ذهبي**.")
+    except: bot.send_message(ADMIN_ID, "❌ خطأ في الآيدي.")
+
+def broadcast_logic(message, title):
+    """إرسال جماعي محمي مع تأخير"""
+    bot.send_message(ADMIN_ID, "⏳ جاري بدء التعميم.. يرجى عدم إرسال أوامر أخرى.")
+    users = db.table("users").select("id").execute().data
+    success = 0
+    for u in users:
+        try:
+            time.sleep(0.15) # تأخير لمنع الـ Spam
+            bot.send_message(u['id'], f"{title}\n\n{message.text}", parse_mode="Markdown")
+            success += 1
+        except: continue
+    bot.send_message(ADMIN_ID, f"✅ تم اكتمال الإرسال لـ {success} مستخدم.")
+
+# --- [ 6. استلام الإيصالات ] ---
+
+@bot.message_handler(content_types=['photo'])
+def handle_receipts(message):
+    uid = message.from_user.id
+    bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
+    bot.send_message(ADMIN_ID, f"🔔 **إيصال جديد!**\nآيدي المستخدم: `{uid}`", parse_mode="Markdown")
+    bot.reply_to(message, "✅ **تم استلام الصورة!**\nجاري مراجعة العملية من قبل الإدارة لشحن رصيدك فوراً.")
+
+# --- التشغيل النهائي ---
+print("🚀 Prestige Trading Bot is Running Perfectly...")
+bot.infinity_polling()
     
     # التأخير المطلوب للرزانة (Delay)
     bot.answer_callback_query(call.id, "جاري المعالجة...")
