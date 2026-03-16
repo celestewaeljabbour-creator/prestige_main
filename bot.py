@@ -11,7 +11,7 @@ SUPABASE_KEY = "sb_publishable_m6k-9uz3UVraGkVbjlQqaQ_mCsI7Mht"
 ADMIN_ID = 6091303835 
 SUPPORT_LINK = "https://t.me/tradinghubsy"
 
-# البيانات المالية
+# البيانات المالية للإيداع
 WALLET_USDT = "0xbe3a3F17f1574EE9483eab41B9EE2022Ec316149"
 CASH_SY = "92274277 - 26092765"
 
@@ -22,6 +22,7 @@ logging.basicConfig(level=logging.INFO)
 # --- [ 2. دوال القوائم (Keyboard Functions) ] ---
 
 def main_menu(uid):
+    """بناء القائمة الرئيسية الكاملة"""
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("📥 إيداع رصيد", callback_data="m_deposit"),
@@ -43,6 +44,7 @@ def back_btn():
     return types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 العودة للقائمة", callback_data="go_home"))
 
 def admin_kb():
+    """لوحة تحكم الأدمن المتكاملة"""
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         types.InlineKeyboardButton("📢 تعميم صفقة جديدة", callback_data="adm_broadcast_trade"),
@@ -61,17 +63,17 @@ def start_command(message):
     uid = message.from_user.id
     uname = message.from_user.username or "Prestige_User"
     
-    # محاكاة التحميل
+    # محاكاة "جاري المعالجة" للفخامة
     bot.send_chat_action(uid, 'typing')
-    time.sleep(0.4)
+    time.sleep(0.5)
     
-    # فحص الإحالة
+    # معالجة نظام الإحالات
     ref_by = None
     args = message.text.split()
     if len(args) > 1 and args[1].isdigit():
         ref_by = int(args[1]) if int(args[1]) != uid else None
 
-    # التسجيل في القاعدة
+    # تسجيل المستخدم في Supabase
     try:
         db.table("users").upsert({
             "id": uid, "username": uname, "referred_by": ref_by, "balance": 0.0
@@ -81,7 +83,7 @@ def start_command(message):
     welcome_msg = (
         f"💎 **مرحباً بك في نظام Prestige للتداول**\n\n"
         f"أهلاً بك يا `{uname}`.. تم تهيئة حسابك بنجاح.\n"
-        f"يمكنك البدء بمتابعة الصفقات أو شحن محفظتك للاستثمار الآلي."
+        f"استخدم الأزرار أدناه للتحكم بمحفظتك ومتابعة الصفقات."
     )
     bot.send_message(uid, welcome_msg, reply_markup=main_menu(uid), parse_mode="Markdown")
 
@@ -92,23 +94,162 @@ def router(call):
     uid = call.from_user.id
     mid = call.message.message_id
     
-    # إضافة التأخير المطلوب (0.5 ثانية) للرزانة
-    time.sleep(0.5)
-    bot.answer_callback_query(call.id)
+    # إضافة التأخير المطلوب لضمان الاستقرار
+    time.sleep(0.4)
+    try:
+        bot.answer_callback_query(call.id)
+    except: pass
 
+    # --- التنقل الأساسي ---
     if call.data == "go_home":
         bot.edit_message_text("💎 القائمة الرئيسية لمنصة Prestige:", uid, mid, reply_markup=main_menu(uid))
 
     # --- أقسام المستخدم ---
     elif call.data == "m_wallet":
-        res = db.table("users").select("balance").eq("id", uid).execute()
-        balance = res.data[0]['balance'] if res.data else 0.0
+        try:
+            res = db.table("users").select("balance").eq("id", uid).execute()
+            balance = res.data[0]['balance'] if res.data else 0.0
+        except: balance = 0.0
         txt = (f"👤 **مركزك المالي**\n\n"
                f"💰 الرصيد الحالي: `{balance}$`\n"
                f"📊 أرباح اليوم: `0.00$`\n"
-               f"⌛️ سحوبات معلقة: `0.00$`")
+               f"⌛️ سحوبات معلقة: `0.00$`\n\n"
+               f"التصنيف: مستثمر فضي 🥈")
         bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
 
+    elif call.data == "m_team":
+        link = f"https://t.me/Prestige_Trading_Bot?start={uid}"
+        txt = (f"👥 **نظام الشركاء**\n\n"
+               f"اربح **5%** عمولة فورية عن كل إيداع يقوم به فريقك.\n\n"
+               f"🔗 رابط الدعوة الخاص بك:\n`{link}`")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_earn":
+        txt = ("💰 **برنامج المروجين (اربح معنا)**\n\n"
+               "📹 **TikTok/YouTube:**\n"
+               "• مكافأة **10$** عن كل 2000 مشاهدة.\n"
+               "• الشروط: ظهور صورة البوت واستخدام الهاشتاقات المعتمدة.\n\n"
+               "ارسل رابط منشورك للدعم للمراجعة والصرف.")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_prizes":
+        txt = ("🎁 **جوائز الإحالات الكبرى**\n\n"
+               "حقق الأهداف واستلم جائزتك (لأول 10 أشخاص):\n"
+               "• 50 إحالة نشطة ⬅️ **AirPods Pro 🎧**\n"
+               "• 150 إحالة نشطة ⬅️ **Xiaomi Redmi Note 📱**\n"
+               "• 500 إحالة نشطة ⬅️ **iPhone 15 Pro Max 🍎**\n\n"
+               "تتم مراجعة الإحالات يدوياً لضمان عدم وجود حسابات وهمية.")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_agents":
+        txt = ("🤵 **قسم الوكلاء (Agents)**\n\n"
+               "عند وصول فريقك لـ 50 عضو نشط:\n"
+               "• راتب شهري **100$**.\n"
+               "• بونص إيداع **10%**.\n\n"
+               "تواصل مع الإدارة لتقديم طلب ترقية حسابك.")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_btn(), parse_mode="Markdown")
+
+    elif call.data == "m_ai":
+        bot.edit_message_text("📈 **التداول الآلي (AI Mode)**\n\nيتم حالياً ربط البوت بمحركات الذكاء الاصطناعي لفتح الصفقات تلقائياً.. انتظرونا قريباً!", uid, mid, reply_markup=back_btn())
+
+    elif call.data == "m_trades":
+        bot.edit_message_text("📊 **سجل صفقات اليوم**\n\nلا توجد صفقات مفتوحة حالياً. ترقب إشعارات الإدارة.", uid, mid, reply_markup=back_btn())
+
+    # --- أقسام الإيداع والسحب ---
+    elif call.data == "m_deposit":
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton("USDT (BEP20) ⚡️", callback_data="pay_usdt"),
+            types.InlineKeyboardButton("سيريتل كاش 🇸🇾", callback_data="pay_syria"),
+            types.InlineKeyboardButton("🔙 رجوع", callback_data="go_home")
+        )
+        bot.edit_message_text("📥 اختر وسيلة الإيداع المناسبة لك:", uid, mid, reply_markup=markup)
+
+    elif call.data.startswith("pay_"):
+        addr = WALLET_USDT if "usdt" in call.data else CASH_SY
+        txt = (f"⚠️ **تعليمات شحن الرصيد:**\n\n"
+               f"1. حول المبلغ إلى العنوان التالي:\n`{addr}`\n\n"
+               f"2. ارسل صورة الإيصال (Screenshot) هنا فوراً.\n\n"
+               f"سيقوم القسم المالي بشحن حسابك خلال دقائق.")
+        bot.edit_message_text(txt, uid, mid, parse_mode="Markdown")
+
+    elif call.data == "m_withdraw":
+        bot.edit_message_text("📤 **طلب سحب أرباح**\n\nالحد الأدنى للسحب هو **10$**.\nرصيدك الحالي لا يسمح بإجراء العملية حالياً.", uid, mid, reply_markup=back_btn())
+
+    # --- لوحة التحكم (الأدمن) ---
+    elif call.data == "admin_main" and uid == ADMIN_ID:
+        bot.edit_message_text("👑 **لوحة تحكم الأدمن**\nاختر الإجراء المطلوب تنفيذه:", uid, mid, reply_markup=admin_kb())
+
+    elif call.data == "adm_stats" and uid == ADMIN_ID:
+        count = db.table("users").select("id", count='exact').execute().count
+        bot.answer_callback_query(call.id, f"إجمالي المشتركين: {count}", show_alert=True)
+
+    elif call.data == "adm_gold_agents" and uid == ADMIN_ID:
+        msg = bot.send_message(uid, "أرسل ID المستخدم لترقيته لوكيل ذهبي:")
+        bot.register_next_step_handler(msg, set_agent_logic)
+
+    elif call.data == "adm_broadcast_trade" and uid == ADMIN_ID:
+        msg = bot.send_message(uid, "أرسل تفاصيل الصفقة (العملة، الرافعة، الدخول):")
+        bot.register_next_step_handler(msg, broadcast_logic, "🚨 **توصية تداول جديدة**")
+
+    elif call.data == "adm_broadcast_result" and uid == ADMIN_ID:
+        msg = bot.send_message(uid, "أرسل نتيجة الصفقة (مثال: تم الإغلاق بربح 20% ✅):")
+        bot.register_next_step_handler(msg, broadcast_logic, "✅ **تحديث نتيجة الصفقة**")
+
+    elif call.data == "adm_charge_user" and uid == ADMIN_ID:
+        msg = bot.send_message(uid, "أرسل ID المستخدم متبوعاً بالمبلغ (مثال: 6091303835 50):")
+        bot.register_next_step_handler(msg, charge_user_logic)
+
+# --- [ 5. منطق الإدارة (Handlers) ] ---
+
+def set_agent_logic(message):
+    try:
+        target_id = int(message.text)
+        db.table("users").update({"is_agent": True}).eq("id", target_id).execute()
+        bot.send_message(ADMIN_ID, f"✅ تم ترقية `{target_id}` بنجاح.")
+        bot.send_message(target_id, "🎊 مبروك! تمت ترقية حسابك إلى **وكيل ذهبي**.")
+    except: bot.send_message(ADMIN_ID, "❌ خطأ في الآيدي.")
+
+def charge_user_logic(message):
+    try:
+        parts = message.text.split()
+        target_id = int(parts[0])
+        amount = float(parts[1])
+        # جلب الرصيد القديم
+        res = db.table("users").select("balance").eq("id", target_id).execute()
+        old_bal = res.data[0]['balance'] if res.data else 0.0
+        new_bal = old_bal + amount
+        db.table("users").update({"balance": new_bal}).eq("id", target_id).execute()
+        bot.send_message(ADMIN_ID, f"✅ تم شحن `{amount}$` لـ `{target_id}`. الرصيد الجديد: `{new_bal}$`")
+        bot.send_message(target_id, f"💰 **تم شحن حسابك!**\nتمت إضافة `{amount}$` إلى محفظتك بنجاح.")
+    except: bot.send_message(ADMIN_ID, "❌ خطأ في البيانات. ارسل الآيدي ثم المبلغ.")
+
+def broadcast_logic(message, title):
+    """إرسال جماعي محمي من الحظر"""
+    bot.send_message(ADMIN_ID, "⏳ جاري الإرسال للجميع...")
+    users = db.table("users").select("id").execute().data
+    success = 0
+    for u in users:
+        try:
+            time.sleep(0.15) # تأخير لتجنب Errno -2
+            bot.send_message(u['id'], f"{title}\n\n{message.text}", parse_mode="Markdown")
+            success += 1
+        except: continue
+    bot.send_message(ADMIN_ID, f"✅ تم الإرسال لـ {success} مستخدم.")
+
+# --- [ 6. استلام الإيصالات ] ---
+
+@bot.message_handler(content_types=['photo'])
+def handle_receipts(message):
+    uid = message.from_user.id
+    uname = message.from_user.username or "Unknown"
+    bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
+    bot.send_message(ADMIN_ID, f"🔔 **إشعار إيداع جديد!**\nالمستخدم: @{uname}\nID: `{uid}`", parse_mode="Markdown")
+    bot.reply_to(message, "✅ **تم استلام الصورة!**\nجاري تدقيق العملية وسوف يتم شحن رصيدك فوراً.")
+
+# --- التشغيل النهائي ---
+print("🚀 Prestige Bot is Now Fixed and Secure...")
+bot.infinity_polling(timeout=60, long_polling_timeout=60)
     elif call.data == "m_team":
         link = f"https://t.me/Prestige_Trading_Bot?start={uid}"
         txt = (f"👥 **نظام الشركاء**\n\n"
