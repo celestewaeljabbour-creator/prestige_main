@@ -2,7 +2,7 @@ import telebot
 from telebot import types
 from supabase import create_client, Client
 
-# --- البيانات الجديدة والنهائية ---
+# --- الإعدادات النهائية (التوكنات الجديدة) ---
 TOKEN = "8795395476:AAFVU9fXwQF8dwlh8kSnK1Z9GnOY4VEag8Q" 
 SUPABASE_URL = "https://asogzloqqxbjgnjifotm.supabase.co"
 SUPABASE_KEY = "sb_publishable_m6k-9uz3UVraGkVbjlQqaQ_mCsI7Mht"
@@ -15,47 +15,69 @@ SYRIATEL_CASH = "92274277 - 26092765 - 64288797 - 15260106"
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# دالة لتوليد القائمة الرئيسية (Inline)
+def main_menu():
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("📥 إيداع", callback_data="deposit"),
+        types.InlineKeyboardButton("📤 سحب", callback_data="withdraw"),
+        types.InlineKeyboardButton("👤 محفظتي", callback_data="wallet"),
+        types.InlineKeyboardButton("👥 فريقي", callback_data="team"),
+        types.InlineKeyboardButton("🛠 الدعم الفني", callback_data="support")
+    )
+    return markup
+
 @bot.message_handler(commands=['start'])
 def start(message):
+    user_id = message.from_user.id
+    username = message.from_user.username or "عزيزي المشترك"
+    
+    # تسجيل في السوبا
     try:
-        user_id = message.from_user.id
-        username = message.from_user.username or "User"
+        supabase.table("users").upsert({"id": user_id, "username": username}).execute()
+    except: pass
+
+    welcome_msg = (
+        f"✨ **مرحباً بك في عالم Prestige Trading** ✨\n\n"
+        f"عزيزي {username}، أنت الآن متصل بأقوى نظام تداول آلي.\n"
+        f"استخدم الأزرار أدناه لإدارة استثماراتك."
+    )
+    bot.send_message(user_id, welcome_msg, reply_markup=main_menu(), parse_mode="Markdown")
+
+@bot.callback_query_handler(func=lambda call: True)
+def handle_query(call):
+    chat_id = call.message.chat.id
+    message_id = call.message.message_id
+
+    if call.data == "main_menu":
+        bot.edit_message_text("اختر من القائمة الرئيسية:", chat_id, message_id, reply_markup=main_menu())
+
+    elif call.data == "deposit":
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("USDT (BEP20)", callback_data="pay_usdt"))
+        markup.add(types.InlineKeyboardButton("سيريتل كاش", callback_data="pay_syriatel"))
+        markup.add(types.InlineKeyboardButton("🔙 رجوع", callback_data="main_menu"))
+        bot.edit_message_text("💎 **قسم الإيداع**\n\nاختر وسيلة الدفع المناسبة لك:", chat_id, message_id, reply_markup=markup, parse_mode="Markdown")
+
+    elif call.data.startswith("pay_"):
+        method = "USDT BEP20" if "usdt" in call.data else "سيريتل كاش"
+        address = USDT_WALLET if "usdt" in call.data else SYRIATEL_CASH
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 رجوع", callback_data="deposit"))
         
-        # تسجيل المستخدم في قاعدة البيانات (Supabase)
-        supabase.table("users").upsert({
-            "id": user_id, 
-            "username": username
-        }).execute()
+        pay_msg = f"✅ **تم اختيار {method}**\n\nيرجى التحويل إلى:\n`{address}`\n\nبعد التحويل، أرسل سكرين شوت (صورة) للعملية هنا."
+        bot.edit_message_text(pay_msg, chat_id, message_id, reply_markup=markup, parse_mode="Markdown")
 
-        markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-        markup.add("📥 إيداع", "📤 سحب", "👤 محفظتي", "👥 فريقي", "🛠 الدعم الفني")
-        bot.send_message(user_id, f"👑 أهلاً بك {username} في Prestige Trading\nالسيستم يعمل الآن بنجاح وقاعدة البيانات متصلة.", reply_markup=markup)
-    except Exception as e:
-        # إذا حدث خطأ في الاتصال بقاعدة البيانات، يستمر البوت في العمل
-        markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-        markup.add("📥 إيداع", "📤 سحب", "👤 محفظتي", "👥 فريقي", "🛠 الدعم الفني")
-        bot.send_message(message.chat.id, "👑 أهلاً بك في Prestige Trading\nالبوت جاهز لخدمتك.", reply_markup=markup)
-
-@bot.message_handler(func=lambda message: message.text == "📥 إيداع")
-def deposit(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("USDT (BEP20)", callback_data="pay_usdt"))
-    markup.add(types.InlineKeyboardButton("سيريتل كاش", callback_data="pay_syriatel"))
-    bot.send_message(message.chat.id, "اختر وسيلة الإيداع المتاحة:", reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('pay_'))
-def payment_details(call):
-    if call.data == "pay_usdt":
-        msg = f"حول لعنوان USDT BEP20:\n\n`{USDT_WALLET}`"
-    else:
-        msg = f"حول لأحد أرقام سيريتل كاش:\n\n`{SYRIATEL_CASH}`"
-    bot.send_message(call.message.chat.id, f"{msg}\n\n⚠️ أرسل صورة التحويل (سكرين شوت) الآن ليتم التأكيد.", parse_mode="Markdown")
+    elif call.data in ["withdraw", "wallet", "team", "support"]:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 رجوع", callback_data="main_menu"))
+        bot.edit_message_text("🚧 هذا القسم قيد التجهيز وسيتم تفعيله خلال ساعات.", chat_id, message_id, reply_markup=markup)
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
-    # إرسال صورة التحويل للأدمن فوراً
+    # إرسال للأدمن
     bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
-    bot.reply_to(message, "✅ تم استلام الصورة، جاري مراجعة العملية من قبل الإدارة.")
+    bot.send_message(ADMIN_ID, f"🔔 **إشعار إيداع جديد!**\nمن المستخدم: @{message.from_user.username}\nID: `{message.from_user.id}`", parse_mode="Markdown")
+    bot.reply_to(message, "✅ **تم استلام الصورة**\nجاري تدقيق العملية من قبل الإدارة وسوف يتم شحن رصيدك فوراً.")
 
-# تشغيل البوت بشكل مستمر وتلقائي
 bot.infinity_polling()
