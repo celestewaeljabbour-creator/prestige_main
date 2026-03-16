@@ -35,217 +35,121 @@ def main_kb(uid):
 def back_kb():
     return types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 العودة للقائمة", callback_data="home"))
 
-# --- أوامر الأدمن ---
+# --- وظائف الأدمن ---
 
 @bot.callback_query_handler(func=lambda call: call.data == "admin_main")
 def admin_panel(call):
-    if call.from_user.id != ADMIN_ID: return
+    time.sleep(0.5)
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("📢 تعميم صفقة جديدة", callback_data="adm_send_trade"),
-        types.InlineKeyboardButton("✅ تعميم نتيجة صفقة", callback_data="adm_send_result"),
-        types.InlineKeyboardButton("👥 إدارة الوكلاء الذهبيين", callback_data="adm_manage_agents"),
-        types.InlineKeyboardButton("📊 إحصائيات البوت", callback_data="adm_stats"),
+        types.InlineKeyboardButton("📢 تعميم صفقة جديدة", callback_data="adm_trade"),
+        types.InlineKeyboardButton("✅ تعميم نتيجة صفقة", callback_data="adm_result"),
+        types.InlineKeyboardButton("➕ إضافة وكيل ذهبي", callback_data="adm_add_agent"),
+        types.InlineKeyboardButton("📊 إحصائيات المستخدمين", callback_data="adm_stats"),
         types.InlineKeyboardButton("🔙 رجوع", callback_data="home")
     )
-    bot.edit_message_text("👑 **لوحة التحكم العليا**\nأهلاً بك يا زعيم، اختر ما تريد التحكم به:", call.from_user.id, call.message.message_id, reply_markup=markup)
+    bot.edit_message_text("👑 **لوحة الإدارة العليا**\nتحكم بالبوت والوكلاء والرسائل الجماعية:", call.from_user.id, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data == "adm_stats")
-def bot_stats(call):
+def get_stats(call):
     count = db.table("users").select("id", count='exact').execute().count
-    bot.answer_callback_query(call.id, f"عدد المستخدمين الكلي: {count}")
+    bot.answer_callback_query(call.id, f"إجمالي المستخدمين: {count}", show_alert=True)
 
-@bot.callback_query_handler(func=lambda call: call.data == "adm_manage_agents")
-def manage_agents_kb(call):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("➕ إضافة وكيل", callback_data="add_agent_flow"))
-    markup.add(types.InlineKeyboardButton("🔙 رجوع", callback_data="admin_main"))
-    bot.edit_message_text("🛠 **إدارة الوكلاء**\nيمكنك منح صلاحيات الوكيل الذهبي للمستخدمين عبر الـ ID:", call.from_user.id, call.message.message_id, reply_markup=markup)
+@bot.callback_query_handler(func=lambda call: call.data == "adm_add_agent")
+def ask_agent_id(call):
+    msg = bot.send_message(call.from_user.id, "أرسل ID المستخدم لترقيته لوكيل ذهبي:")
+    bot.register_next_step_handler(msg, process_agent)
 
-@bot.callback_query_handler(func=lambda call: call.data == "add_agent_flow")
-def ask_id(call):
-    msg = bot.send_message(call.from_user.id, "ارسل ID المستخدم المراد ترقيته:")
-    bot.register_next_step_handler(msg, process_agent_upgrade)
-
-def process_agent_upgrade(message):
+def process_agent(message):
     try:
         uid = int(message.text)
         db.table("users").update({"is_agent": True}).eq("id", uid).execute()
-        bot.send_message(ADMIN_ID, f"✅ تم تفعيل الوكيل الذهبي لـ `{uid}`")
-        bot.send_message(uid, "🎊 تهانينا! تمت ترقيتك إلى **وكيل ذهبي**.")
+        bot.send_message(ADMIN_ID, f"✅ تم تعيين `{uid}` كوكيل ذهبي.")
+        bot.send_message(uid, "🎊 مبروك! تم منحك رتبة **وكيل ذهبي**.")
     except: bot.send_message(ADMIN_ID, "❌ خطأ في الـ ID.")
 
-# --- الأقسام العامة ---
+# --- نظام التعميم ---
 
-@bot.callback_query_handler(func=lambda call: call.data == "earn")
-def earn_section(call):
-    time.sleep(0.6)
-    txt = ("💰 **قسم اربح معنا (المروجين)**\n\n"
-           "اربح دولارات مقابل الترويج للبوت:\n\n"
-           "📹 **فيديو (تيك توك/يوتيوب):**\n"
-           "• يجب أن يظهر البوت وصورته بشكل واضح.\n"
-           "• استخدم هاشتاقات: #Prestige_Trading #تداول\n"
-           "• المكافأة: 10$ لكل 2000 مشاهدة.\n\n"
-           "📸 **منشورات اجتماعية:**\n"
-           "• نشر الرابط في مجموعات تداول كبرى.\n\n"
-           "ارسل رابط عملك للدعم الفني للتقييم.")
-    bot.edit_message_text(txt, call.from_user.id, call.message.message_id, reply_markup=back_kb())
-
-@bot.callback_query_handler(func=lambda call: call.data == "team")
-def team_section(call):
-    uid = call.from_user.id
-    link = f"https://t.me/Prestige_Trading_Bot?start={uid}"
-    txt = (f"👥 **نظام الشركاء**\n\n"
-           f"رابط دعوتك الحصري:\n`{link}`\n\n"
-           f"اربح عمولة 5% على كل إيداع يقوم به فريقك.")
-    bot.edit_message_text(txt, uid, call.message.message_id, reply_markup=back_kb(), parse_mode="Markdown")
-
-# --- نظام التعميم (Broadcast) ---
-
-def broadcast_logic(message, title):
-    bot.send_message(ADMIN_ID, "⏳ جاري الإرسال للجميع مع التأخير البرمجي...")
+def broadcast(message, title):
     users = db.table("users").select("id").execute().data
+    bot.send_message(ADMIN_ID, "⏳ بدأت عملية التعميم...")
     for u in users:
         try:
-            time.sleep(0.1) # التأخير المطلوب لمنع الحظر والتعليق
+            time.sleep(0.1)
             bot.send_message(u['id'], f"{title}\n\n{message.text}", parse_mode="Markdown")
         except: continue
-    bot.send_message(ADMIN_ID, "✅ تم اكتمال الإرسال.")
+    bot.send_message(ADMIN_ID, "✅ تم الإرسال للجميع.")
 
-@bot.callback_query_handler(func=lambda call: call.data == "adm_send_trade")
-def trade_msg(call):
-    msg = bot.send_message(ADMIN_ID, "ارسل نص الصفقة الآن:")
-    bot.register_next_step_handler(msg, broadcast_logic, "🚨 **صفقة جديدة من الإدارة**")
+@bot.callback_query_handler(func=lambda call: call.data == "adm_trade")
+def trade_input(call):
+    msg = bot.send_message(ADMIN_ID, "اكتب تفاصيل الصفقة الجديدة:")
+    bot.register_next_step_handler(msg, broadcast, "🚨 **صفقة جديدة من الإدارة**")
 
-@bot.callback_query_handler(func=lambda call: call.data == "adm_send_result")
-def result_msg(call):
-    msg = bot.send_message(ADMIN_ID, "ارسل نص النتيجة الآن:")
-    bot.register_next_step_handler(msg, broadcast_logic, "✅ **تحديث نتيجة التداول**")
+@bot.callback_query_handler(func=lambda call: call.data == "adm_result")
+def result_input(call):
+    msg = bot.send_message(ADMIN_ID, "اكتب نتيجة الصفقة:")
+    bot.register_next_step_handler(msg, broadcast, "✅ **تحديث نتيجة التداول**")
 
-# --- التشغيل الأساسي ---
+# --- معالجة الأزرار العامة ---
 
-@bot.message_handler(commands=['start'])
-def start_cmd(message):
+@bot.callback_query_handler(func=lambda call: True)
+def handle_all_btns(call):
+    uid = call.from_user.id
+    mid = call.message.message_id
+    
+    # تأخير "الرزانة"
     time.sleep(0.5)
-    bot.send_message(message.from_user.id, "💎 جاري تهيئة نظام Prestige...", reply_markup=main_kb(message.from_user.id))
+    bot.answer_callback_query(call.id)
 
-@bot.callback_query_handler(func=lambda call: call.data == "home")
-def home_btn(call):
-    bot.edit_message_text("القائمة الرئيسية:", call.from_user.id, call.message.message_id, reply_markup=main_kb(call.from_user.id))
+    if call.data == "home":
+        bot.edit_message_text("القائمة الرئيسية لمنصة Prestige:", uid, mid, reply_markup=main_kb(uid))
 
-bot.infinity_polling()
     elif call.data == "wallet":
         res = db.table("users").select("balance").eq("id", uid).execute()
         bal = res.data[0]['balance'] if res.data else 0.0
-        txt = (f"👤 **مركزك المالي**\n\n"
-               f"💰 الرصيد المتاح: `{bal}$`\n"
-               f"📉 أرباح التداول: `0.00$`\n"
-               f"🎁 بونص الإحالات: `0.00$`")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
+        bot.edit_message_text(f"👤 **محفظتي**\n\n💰 الرصيد المتاح: `{bal}$`", uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
 
     elif call.data == "team":
         link = f"https://t.me/Prestige_Trading_Bot?start={uid}"
-        txt = (f"👥 **نظام الشركاء**\n\n"
-               f"شارك رابطك واربح 5% من إيداعات فريقك.\n\n"
-               f"رابط دعوتك الحصري:\n`{link}`")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
-
-    elif call.data == "bot_trades":
-        txt = ("📊 **سجل التداول وصفقات البوت**\n\n"
-               "في هذا القسم، تتلقى الإشعارات والتوصيات المباشرة من الإدارة لنسخ الصفقات.\n"
-               "انتظر إشعارات البوت عند فتح أو إغلاق أي صفقة لتعرف نسبة الأرباح فوراً.")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
-
-    elif call.data == "withdraw":
-        txt = ("📤 **سحب الأرباح**\n\n"
-               "عذراً، رصيدك الحالي غير كافٍ لإجراء عملية السحب. الحد الأدنى للسحب هو 10$.\n"
-               "يتم السحب عبر شبكة USDT (BEP20) حصراً.")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
-
-    elif call.data == "trade_ai":
-        txt = ("📈 **التداول الآلي (AI)**\n\n"
-               "قريباً سيتم تفعيل روبوت التداول الذكي الخاص بنا لنسخ الصفقات وإدارتها تلقائياً.")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
+        bot.edit_message_text(f"👥 **فريقك**\n\nرابط دعوتك:\n`{link}`\n\nعمولتك: 5% من إيداعات فريقك.", uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
 
     elif call.data == "earn":
-        txt = ("💰 **اربح معنا**\n\n"
-               "سيتم إطلاق نظام المهام اليومية والمكافآت الإضافية في التحديث القادم. ابقَ على اطلاع!")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
+        txt = ("💰 **اربح من الترويج**\n\n"
+               "📹 تيك توك/يوتيوب: 10$ لكل 2000 مشاهدة.\n"
+               "شرط وجود صورة البوت والهاشتاقات: #Prestige_Trading\n"
+               "ارسل الرابط للدعم للمراجعة.")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb())
 
     elif call.data == "prizes":
-        txt = ("🎁 **مسابقة انطلاق البوت الكبرى**\n\n"
-               "في مسابقة بالبوت أول ما يفتح فيها 5 أنواع جوائز وكل جائزة مسموحة بس **لأول 10 أشخاص** بيخلصوا المطلوب منهم يعني (50 رابح) وكل فترة تتجدد الجوائز:\n\n"
-               "🍎 أول 10 بيجيبوا 10 متداولين يودعوا 50$ ⬅️ **iPhone 15 Pro Max**\n"
-               "📱 أول 10 بيجيبوا 10 متداولين يودعوا 25$ ⬅️ **iPhone 13 Pro**\n"
-               "📲 أول 10 بيجيبوا 10 متداولين يودعوا 15$ ⬅️ **موبايل Xiaomi**\n"
-               "⌚️ أول 10 بيجيبوا 10 متداولين يودعوا 10$ ⬅️ **Smart Watch**\n"
-               "🎧 أول 10 بيجيبوا 10 متداولين يودعوا 5$ ⬅️ **سماعات Bluetooth**\n\n"
-               "اللعبة مو مين أكتر، اللعبة مين **أسرع** بيجيب الـ 10 متداولين ضمن فئته وبيخلص لياخد الجائزة فوراً قبل ما يخلصوا الكراسي الـ 10. السباق سيبدأ مع الانطلاق!")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
+        txt = ("🎁 **مسابقة الانطلاق (أول 10 أشخاص لكل فئة)**\n\n"
+               "• 10 متداولين (إيداع 50$) ⬅️ **iPhone 15 Pro Max**\n"
+               "• 10 متداولين (إيداع 25$) ⬅️ **iPhone 13 Pro**\n"
+               "• 10 متداولين (إيداع 15$) ⬅️ **Xiaomi**\n"
+               "• 10 متداولين (إيداع 10$) ⬅️ **Smart Watch**\n"
+               "• 10 متداولين (إيداع 5$) ⬅️ **سماعات Bluetooth**\n\n"
+               "اللعبة لعبة سرعة! خلص مطلوبك واستلم.")
+        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb())
+
+    elif call.data == "bot_trades":
+        bot.edit_message_text("📊 **صفقات البوت**\n\nانتظر إشعارات الإدارة هنا لنسخ الصفقات فور صدورها.", uid, mid, reply_markup=back_kb())
+
+    elif call.data == "withdraw":
+        bot.edit_message_text("📤 **سحب الأرباح**\n\nأقل مبلغ للسحب هو 10$. رصيدك حالياً لا يسمح.", uid, mid, reply_markup=back_kb())
+
+    elif call.data == "trade_ai":
+        bot.edit_message_text("📈 **التداول الآلي**\n\nيتم حالياً تطوير ذكاء اصطناعي لفتح الصفقات تلقائياً. انتظرونا!", uid, mid, reply_markup=back_kb())
 
     elif call.data == "agents":
-        txt = ("🤵 **برنامج الوكلاء (VIP)**\n\n"
-               "الوكيل هو من يملك فريقاً نشطاً فوق الـ 50 شخص.\n\n"
-               "💰 **المميزات:**\n"
-               "• راتب شهري ثابت: **100$**.\n"
-               "• نسبة عمولة ترتفع لـ **10%**.\n"
-               "• دعم فني خاص متاح 24/7.\n\n"
-               "تواصل مع الإدارة لطلب الترقية.")
-        bot.edit_message_text(txt, uid, mid, reply_markup=back_kb(), parse_mode="Markdown")
+        bot.edit_message_text("🤵 **قسم الوكلاء**\n\nراتب شهري 100$ للوكلاء النشطين (فريق فوق 50 شخص). تواصل مع الدعم للتقديم.", uid, mid, reply_markup=back_kb())
 
     elif call.data == "deposit":
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        markup.add(
-            types.InlineKeyboardButton("USDT (BEP20) ⚡️", callback_data="p_usdt"),
-            types.InlineKeyboardButton("Syriatel Cash 🇸🇾", callback_data="p_cash"),
-            types.InlineKeyboardButton("🔙 رجوع", callback_data="home")
-        )
-        bot.edit_message_text("📥 **شحن المحفظة**\nاختر وسيلة الدفع المناسبة:", uid, mid, reply_markup=markup)
+        bot.edit_message_text("📥 **إيداع**\n\nأرسل صورة الإيصال للدعم بعد التحويل لـ:\nUSDT: `0xbe3a3...`", uid, mid, reply_markup=back_kb())
 
-    elif call.data.startswith("p_"):
-        addr = USDT_ADDR if "usdt" in call.data else SYRIATEL_CASH
-        msg = (f"⚠️ **تعليمات الشحن**\n\n"
-               f"حول المبلغ المطلوب إلى:\n`{addr}`\n\n"
-               f"📸 أرسل صورة الإيصال هنا فوراً ليتم تفعيل رصيدك.")
-        bot.edit_message_text(msg, uid, mid, parse_mode="Markdown")
+# --- الأوامر ---
 
-    # --- قسم الإدارة (تعميم الصفقات) ---
-    elif call.data == "admin_main":
-        if uid == ADMIN_ID:
-            markup = types.InlineKeyboardMarkup(row_width=1)
-            markup.add(
-                types.InlineKeyboardButton("📢 تعميم صفقة جديدة للكل", callback_data="admin_trade"),
-                types.InlineKeyboardButton("✅ تعميم نتيجة صفقة (ربح/خسارة)", callback_data="admin_result"),
-                types.InlineKeyboardButton("🔙 رجوع", callback_data="home")
-            )
-            bot.edit_message_text("👑 **لوحة تحكم الأدمن**\nاختر الإجراء المطلوب إرساله للمشتركين:", uid, mid, reply_markup=markup)
+@bot.message_handler(commands=['start'])
+def start_msg(message):
+    time.sleep(0.5)
+    bot.send_message(message.from_user.id, "💎 أهلاً بك في فخر التداول.. نظام Prestige جاهز.", reply_markup=main_kb(message.from_user.id))
 
-    elif call.data == "admin_trade":
-        if uid == ADMIN_ID:
-            msg = bot.edit_message_text("أرسل الآن تفاصيل الصفقة (العملة، السعر، الرافعة...) ليتم إرسالها لجميع المشتركين:", uid, mid)
-            bot.register_next_step_handler(bot.send_message(uid, "اكتب الرسالة الآن:"), send_broadcast_trade)
-
-    elif call.data == "admin_result":
-        if uid == ADMIN_ID:
-            msg = bot.edit_message_text("أرسل الآن تفاصيل النتيجة (مثال: تم إغلاق صفقة BTC بربح 20% ✅):", uid, mid)
-            bot.register_next_step_handler(bot.send_message(uid, "اكتب الرسالة الآن:"), send_broadcast_result)
-
-# --- استلام الصور (إشعارات الإيداع) ---
-
-@bot.message_handler(content_types=['photo'])
-def handle_docs(message):
-    uid = message.from_user.id
-    uname = message.from_user.username or "Unknown"
-    
-    bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
-    caption = (f"🔔 **إشعار إيداع جديد!**\n\n"
-               f"👤 المستخدم: @{uname}\n"
-               f"🆔 الآيدي: `{uid}`\n"
-               f"تأكد من الوصول ثم اشحن الرصيد يدوياً.")
-    bot.send_message(ADMIN_ID, caption, parse_mode="Markdown")
-    
-    bot.reply_to(message, "✅ **تم استلام الإيصال!**\nجاري تدقيق العملية من قبل الإدارة وسوف يتم إشعارك فور التفعيل.")
-
-# --- تشغيل البوت ---
-print("🚀 Prestige Bot is running...")
 bot.infinity_polling()
